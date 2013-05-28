@@ -63,8 +63,8 @@ class ContrastDropout(Cost):
         # Step one: forward prop with the dropout mask.
         pos_y = model.dropout_fprop(
             X,
-            default_include_prob=self._default_include_prob,
-            include_probs=self._include_probs,
+            default_input_include_prob=self._default_input_include_prob,
+            input_include_probs=self._input_include_probs,
             default_input_scale=self._default_input_scale,
             input_scales=self._input_scales
         )
@@ -78,8 +78,8 @@ class ContrastDropout(Cost):
             # Forward prop with one dropout mask.
             fprop = model.dropout_fprop(
                 X,
-                default_include_prob=self._default_include_prob,
-                include_probs=self._include_probs,
+                default_input_include_prob=self._default_input_include_prob,
+                input_include_probs=self._input_include_probs,
                 default_input_scale=self._default_input_scale,
                 input_scales=self._input_scales
             )
@@ -105,8 +105,8 @@ class ContrastDropout(Cost):
         else:
             neg_y = model.dropout_fprop(
                 X,
-                default_include_prob=self._default_include_prob,
-                include_probs=self._include_probs,
+                default_input_include_prob=self._default_input_include_prob,
+                input_include_probs=self._input_include_probs,
                 default_input_scale=self._default_input_scale,
                 input_scales=self._input_scales
             )
