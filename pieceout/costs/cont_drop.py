@@ -4,8 +4,7 @@ import theano
 from pylearn2.costs.cost import Cost
 
 
-def extract_softmax_argument(obj):
-    assert isinstance(obj.owner.op, theano.tensor.nnet.Softmax)
+def extract_op_argument(obj):
     assert len(obj.owner.inputs) == 1
     return obj.owner.inputs[0]
 
@@ -85,14 +84,14 @@ class ContrastDropout(Cost):
             )
             # Average together one or more dropout masks for a sampling
             # approximation of the ensemble prediction.
-            neg_pre = extract_softmax_argument(fprop)
+            neg_pre = extract_op_argument(fprop)
             for i in xrange(self._num_negative_samples - 1):
                 fprop = model.dropout_fprop(X)
-                neg_pre += extract_softmax_argument(fprop)
+                neg_pre += extract_op_argument(fprop)
             neg_pre /= self._num_negative_samples
 
             # Shove it through the softmax once again.
-            neg_target = theano.tensor.nnet.softmax(neg_pre)
+            neg_target = fprop.owner.op(neg_pre)
         else:
             # Otherwise use the deterministic approximate ensemble
             # prediction.
