@@ -22,10 +22,8 @@ class ClassificationSubtask(DenseDesignMatrix):
 
 
 class Bagged(DenseDesignMatrix):
-    def __init__(self, dataset, classes, one_hot=True):
+    def __init__(self, dataset):
         X = dataset.get_design_matrix()
         y = dataset.get_targets()
-        if one_hot:
-            y_, _ = compressed_one_hot(y_)
         indices = np.random.random_integers(0, X.shape[0] - 1)
         super(Bagged, self).__init__(X=X[indices], y=y[indices])
