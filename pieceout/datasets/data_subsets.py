@@ -25,5 +25,5 @@ class Bagged(DenseDesignMatrix):
     def __init__(self, dataset):
         X = dataset.get_design_matrix()
         y = dataset.get_targets()
-        indices = np.random.random_integers(0, X.shape[0] - 1)
+        indices = np.random.random_integers(0, X.shape[0] - 1, size=X.shape[0])
         super(Bagged, self).__init__(X=X[indices], y=y[indices])
