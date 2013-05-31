@@ -5,12 +5,15 @@ from pylearn2.config import yaml_parse
 from pylearn2.monitor import get_channel
 from pylearn2.utils import serial
 num_jobs = 40
+import sys
+name = sys.argv[1]
+print name
 for condition in ['drop', 'sgd', 'ens']:
     errs = np.zeros((num_jobs,))
     for job_num in xrange(num_jobs):
         failed = False
         try:
-            model = serial.load('mnist23/' + condition + '/mnist23_' + condition + '.' + str(job_num) + '_best.pkl')
+            model = serial.load('%s/' % name + condition + '/%s_' % name + condition + '.' + str(job_num) + '_best.pkl')
         except Exception:
             failed = True
             print condition,job_num,'failed'
