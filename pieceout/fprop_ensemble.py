@@ -58,4 +58,6 @@ def compare_ensemble(mlp, dataset, input_scales, arithmetic_mean=False):
     results['approx_pred_error'] = (approx_pred != targets).mean()
     results['ensemble_pred_error'] = (ensemble_preds != targets).mean()
     results['disagreement'] = (approx_pred != ensemble_preds).mean()
+    results['approx_prob'] = approx_prob
+    results['ensemble_prob'] = ensemble_probs
     return results
