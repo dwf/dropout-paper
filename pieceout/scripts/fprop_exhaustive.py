@@ -24,6 +24,8 @@ elif sys.argv[1].startswith('diamond'):
         data = Diamond(1000, rng=3)
     else:
         raise ValueError('WTF')
+elif sys.argv[1].find('svhn') != -1:
+    data = load("/data/lisa/data/gray_svhn_2s_and_3s/test.pkl")
 else:
     raise ValueError("WTF")
 
