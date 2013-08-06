@@ -34,4 +34,7 @@ d = compare_ensemble(model, data, input_scales={'h1': 2., 'y': 2.})
 print sys.argv[1], sys.argv[2], ":", 'geo', d['ensemble_pred_error_geo'], 'ari', d['ensemble_pred_error_ari'], 'w/2', d['approx_pred_error']
 np.save(sys.argv[1] + '_' + sys.argv[2] + '_approx.npy', d['approx_prob'])
 np.save(sys.argv[1] + '_' + sys.argv[2] + '_geo.npy', d['ensemble_prob_geo'])
-np.save(sys.argv[1] + '_' + sys.argv[2] + '_ari.npy', d['ensemble_prob_geo'])
+np.save(sys.argv[1] + '_' + sys.argv[2] + '_ari.npy', d['ensemble_prob_ari'])
+np.save(sys.argv[1] + '_' + sys.argv[2] + '_approx_err.npy', d['approx_pred_error'])
+np.save(sys.argv[1] + '_' + sys.argv[2] + '_geo_err.npy', d['ensemble_pred_error_geo'])
+np.save(sys.argv[1] + '_' + sys.argv[2] + '_ari_err.npy', d['ensemble_pred_error_ari'])
