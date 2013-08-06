@@ -22,6 +22,11 @@ class HandicappedMLP(MLP):
                                              input_space, nvis,
                                              seed)
 
+    def dropout_fprop(self, state_below, default_input_include_prob=0.5,
+                      input_include_probs=None, default_input_scale=2.,
+                      input_scales=None, per_example=True):
+        return self.fprop(state_below)
+
     def fprop(self, state_below):
         return self.masked_fprop(state_below, self.mask,
                                  masked_input_layers=self.masked_input_layers,
