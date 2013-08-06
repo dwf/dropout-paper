@@ -53,7 +53,7 @@ def validate_items(items, valid):
                          (str(w), str(tuple(valid))))
 
 
-def load_covertype(path, which=('train', 'valid'), separate_types=False,
+def load_covertype(path, which_set=('train', 'valid'), separate_types=False,
                    standardize_quantitative=False, dtype=None):
     # Use floatX for quantitative variables if nothing is specified.
     dtype = theano.config.floatX if dtype is None else dtype
