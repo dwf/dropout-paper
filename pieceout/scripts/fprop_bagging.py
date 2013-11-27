@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import sys
 import theano
 import numpy as np
@@ -9,8 +10,7 @@ from pieceout.diamond import Diamond
 model = load(sys.argv[1])
 
 if sys.argv[1].startswith('mnist23'):
-    data = ClassificationSubtask(dataset=MNIST('train', start=50000,
-                                                stop=60000), classes=[2, 3])
+    data = ClassificationSubtask(dataset=MNIST('test'), classes=[2, 3])
 elif sys.argv[1].startswith('diamond'):
 
     data = ClassificationSubtask(dataset=Diamond(1000, rng=3))
@@ -21,7 +21,7 @@ else:
 batch = model.get_input_space().make_batch_theano()
 fprop = model.fprop(batch)
 f = theano.function([batch], [fprop, fprop.owner.inputs[0]])
-pre, post = f(data.get_design_matrix())
+post, pre = f(data.get_design_matrix())
 np.save(sys.argv[1] + '_pre.npy', pre.squeeze())
 np.save(sys.argv[1] + '_post.npy', post.squeeze())
 
@@ -36,3 +36,4 @@ if sys.argv[1].startswith('diamond'):
     grid_pre, grid_post = f(coordinates)
     np.save(sys.argv[1] + '_grid_pre.npy', pre.squeeze())
     np.save(sys.argv[1] + '_grid_post.npy', post.squeeze())
+print "Done"

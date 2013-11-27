@@ -5,6 +5,7 @@ import numpy as np
 from pylearn2.datasets.mnist import MNIST
 from pieceout.datasets.data_subsets import ClassificationSubtask
 from pieceout.datasets.diamond import Diamond
+from pieceout.datasets.covertype import CoverType
 from pieceout.fprop_ensemble import compare_ensemble
 from pylearn2.utils.serial import load
 
@@ -26,6 +27,13 @@ elif sys.argv[1].startswith('diamond'):
         raise ValueError('WTF')
 elif sys.argv[1].find('svhn') != -1:
     data = load("/data/lisa/data/gray_svhn_2s_and_3s/test.pkl")
+elif sys.argv[1].startswith('covertype'):
+    if sys.argv[2] == 'valid':
+        data = ClassificationSubtask(CoverType('valid', prefix='/RQexec/wardefar/data'), classes=[0, 1])
+    elif sys.argv[2] == 'test':
+        data = ClassificationSubtask(CoverType('test', prefix='/RQexec/wardefar/data'), classes=[0, 1])
+    else:
+        raise ValueError('WTF')
 else:
     raise ValueError("WTF")
 

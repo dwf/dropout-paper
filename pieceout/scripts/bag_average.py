@@ -1,9 +1,10 @@
+#!/usr/bin/env python
 import sys
 import numpy as np
 num_models = len(sys.argv[1:-1])
 x = None
 for m in sys.argv[1:-1]:
-    assert "post" in m
+    assert "pre" in m
     fprops = np.load(m)
     if x is None:
         x = fprops
