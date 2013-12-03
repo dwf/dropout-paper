@@ -2,6 +2,7 @@ from collections import OrderedDict
 from itertools import izip
 import theano
 from pylearn2.costs.cost import Cost
+from pylearn2.space import CompositeSpace
 
 
 def extract_op_argument(obj):
@@ -9,7 +10,7 @@ def extract_op_argument(obj):
     return obj.owner.inputs[0]
 
 
-class ContrastDropout(Cost):
+class DropoutBoosting(Cost):
     supervised = True
 
     def __init__(self, same_mask=True, negative_scale=1.,
@@ -55,10 +56,12 @@ class ContrastDropout(Cost):
         gradients = OrderedDict(izip(params, grads))
         return gradients
 
-    def __call__(self, model, X, Y):
-        return model.cost_from_X(X, Y)
+    def expr(self, model, data, **kwargs):
+        self.get_data_specs(model)[0].validate(data)
+        return model.cost_from_X(data)
 
-    def get_gradients(self, model, X, Y):
+    def get_gradients(self, model, data):
+        X, Y = data
         # Step one: forward prop with the dropout mask.
         pos_y = model.dropout_fprop(
             X,
@@ -118,3 +121,9 @@ class ContrastDropout(Cost):
         for key in pg_y:
             g_y[key] = pg_y[key] - self._negative_scale * ng_y[key]
         return g_y, OrderedDict()
+
+    def get_data_specs(self, model):
+        data = CompositeSpace([model.get_input_space(),
+                               model.get_output_space()])
+        sources = (model.get_input_source(), model.get_target_source())
+        return (data, sources)

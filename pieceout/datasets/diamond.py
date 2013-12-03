@@ -63,14 +63,19 @@ class SyntheticDiamond(DenseDesignMatrix):
         y = self._label_fn(X[:, 0], X[:, 1]).reshape((-1, 1))
         if two_targets:
             y_hat = np.zeros(num_examples, dtype='uint8')
-            y_hat.flat[arange(0, num_examples, 2) + y_hat] = 1
+            y_hat.flat[np.arange(0, num_examples, 2) + y_hat] = 1
             y = y_hat
+        ## FUCK THIS NOISE
+        #X += 1
+        #X /= 2
         super(SyntheticDiamond, self).__init__(X=X, y=y)
 
 
 class Diamond(SyntheticDiamond):
     _label_fn = lambda self, *args, **kwargs: _basic_task(*args, **kwargs)
 
+    def get_test_set(self):
+        return Diamond(1000, rng=3)
 
 class NestedDiamond(SyntheticDiamond):
     _label_fn = lambda self, *args, **kwargs: _nested_task(*args, **kwargs)

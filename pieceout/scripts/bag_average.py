@@ -4,7 +4,7 @@ import numpy as np
 num_models = len(sys.argv[1:-1])
 x = None
 for m in sys.argv[1:-1]:
-    assert "pre" in m
+    assert "post" in m
     fprops = np.load(m)
     if x is None:
         x = fprops

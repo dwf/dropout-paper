@@ -1,0 +1,89 @@
+!obj:pylearn2.train.Train {
+    dataset: &train !obj:pieceout.datasets.data_subsets.ClassificationSubtask {
+        dataset: !obj:pylearn2.datasets.mnist.MNIST {
+            which_set: 'train',
+            start: 0,
+            stop: 50000,
+            one_hot: false,
+        },
+        classes: [0, 8],
+        one_hot: true,
+    },
+    model: !obj:pylearn2.models.mlp.MLP {
+        layers: [
+                 !obj:pylearn2.models.maxout.Maxout {
+                     layer_name: 'h0',
+                     num_units: 10,
+                     num_pieces: 1,
+                     irange: .5,
+                     #init_bias: 1.,
+                     min_zero: true
+                 },
+                 !obj:pylearn2.models.maxout.Maxout {
+                     layer_name: 'h1',
+                     num_units: 10,
+                     num_pieces: 1,
+                     irange: .5,
+                     #init_bias: 1.,
+                     min_zero: true
+                 },
+                 !obj:pylearn2.models.mlp.Sigmoid {
+                     layer_name: 'y',
+                     monitor_style: 'classification',
+                     irange: .5,
+                     dim: 1
+                 }
+                ],
+        nvis: 784,
+        seed: ${SEED}
+    },
+    algorithm: !obj:pylearn2.training_algorithms.sgd.SGD {
+        batch_size: ${BATCH_SIZE},
+        learning_rate: ${LEARNING_RATE},
+        init_momentum: ${INIT_MOMENTUM},
+        cost: !obj:pieceout.costs.dropout_boosting.DropoutBoosting {
+            input_include_probs: { 'h0' : 1 },
+            input_scales: { 'h0': 1. }
+        },
+        monitoring_dataset:
+            {
+                'train' : *train,
+                'valid': !obj:pieceout.datasets.data_subsets.ClassificationSubtask {
+                            dataset: !obj:pylearn2.datasets.mnist.MNIST {
+                                which_set: 'train',
+                                start: 50000,
+                                stop: 60000,
+                                one_hot: false,
+                            },
+                            classes: [0, 8],
+                            one_hot: true,
+                        },
+                #'test' : !obj:pieceout.diamond.Diamond {
+                #              num_examples: 10000,
+                #              rng: 3,
+                #          },
+            },
+        termination_criterion: !obj:pylearn2.termination_criteria.MonitorBased {
+            channel_name: "valid_y_misclass",
+            prop_decrease: 0.,
+            N: 100
+        },
+        update_callbacks: !obj:pylearn2.training_algorithms.sgd.ExponentialDecay {
+            decay_factor: ${DECAY_FACTOR}, # 1.00001, # 1 + 1e-5
+            min_lr: .00000001 # 1e-8
+        }
+    },
+    extensions: [
+        !obj:pylearn2.train_extensions.best_params.MonitorBasedSaveBest {
+             channel_name: 'valid_y_misclass',
+             save_path: "${PYLEARN2_TRAIN_FILE_FULL_STEM}_best.${SEED}.pkl"
+        },
+        !obj:pylearn2.training_algorithms.sgd.MomentumAdjustor {
+            start: 1,
+            saturate: ${MOMENTUM_SATURATE},
+            final_momentum: ${FINAL_MOMENTUM}
+        }
+    ],
+    save_path: "${PYLEARN2_TRAIN_FILE_FULL_STEM}.${SEED}.pkl",
+    save_freq: 100,
+}

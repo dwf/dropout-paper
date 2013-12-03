@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import os.path
 import sys
 import theano
 import numpy as np
@@ -9,9 +10,9 @@ from pieceout.diamond import Diamond
 
 model = load(sys.argv[1])
 
-if sys.argv[1].startswith('mnist23'):
+if os.path.basename(sys.argv[1]).startswith('mnist23'):
     data = ClassificationSubtask(dataset=MNIST('test'), classes=[2, 3])
-elif sys.argv[1].startswith('diamond'):
+elif os.path.basename(sys.argv[1]).startswith('diamond'):
 
     data = ClassificationSubtask(dataset=Diamond(1000, rng=3))
 

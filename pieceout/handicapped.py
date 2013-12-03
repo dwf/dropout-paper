@@ -2,6 +2,7 @@ from pylearn2.models.mlp import MLP
 
 
 class HandicappedMLP(MLP):
+    """An MLP with a mask frozen."""
     def __init__(self,
                  layers,
                  batch_size=None,
@@ -21,11 +22,6 @@ class HandicappedMLP(MLP):
         super(HandicappedMLP, self).__init__(layers, batch_size,
                                              input_space, nvis,
                                              seed)
-
-    def dropout_fprop(self, state_below, default_input_include_prob=0.5,
-                      input_include_probs=None, default_input_scale=2.,
-                      input_scales=None, per_example=True):
-        return self.fprop(state_below)
 
     def fprop(self, state_below):
         return self.masked_fprop(state_below, self.mask,
