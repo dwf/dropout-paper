@@ -53,14 +53,15 @@ def validate_items(items, valid):
                          (str(w), str(tuple(valid))))
 
 
-def load_covertype(path, which_set=('train', 'valid'), separate_types=False,
+def load_covertype(path, which_sets=('train', 'valid'), separate_types=False,
                    standardize_quantitative=False, dtype=None):
     # Use floatX for quantitative variables if nothing is specified.
     dtype = theano.config.floatX if dtype is None else dtype
-    which = (which,) if isinstance(which, basestring) else which
+    which_sets = ((which_sets,) if isinstance(which_sets, basestring)
+                  else which_sets)
     # Make sure every set being requested is one of 'train', 'valid', 'test'.
     valid_sets = frozenset(['train', 'valid', 'test'])
-    validate_items(which, valid_sets)
+    validate_items(which_sets, valid_sets)
     fname = prefer_gzipped(path, FILENAME_PREFIX)
     # TODO: inefficient to load the whole file, but loadtxt
     all_data = np.loadtxt(fname, delimiter=',', dtype='int16')
@@ -71,7 +72,7 @@ def load_covertype(path, which_set=('train', 'valid'), separate_types=False,
         quant_std = all_data[SLICES['train'], :QUANTITATIVE_COLS].std(axis=0)
     # Accumulate a dictionary of dictionaries.
     results = {}
-    for which_set in which:
+    for which_set in which_sets:
         results[which_set] = d = {}
         # If the caller requested that qualitative and quantitative
         # be separated, put two items in the dictionary.
