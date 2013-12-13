@@ -6,7 +6,7 @@
             stop: 50000,
             one_hot: false,
         },
-        classes: [1, 7],
+        classes: [1, 8],
         one_hot: true,
     },
     model: !obj:pylearn2.models.mlp.MLP {
@@ -41,6 +41,10 @@
         batch_size: ${BATCH_SIZE},
         learning_rate: ${LEARNING_RATE},
         init_momentum: ${INIT_MOMENTUM},
+        cost: !obj:pieceout.costs.dropout_boosting.DropoutBoosting {
+            input_include_probs: { 'h0' : 1 },
+            input_scales: { 'h0': 1. }
+        },
         monitoring_dataset:
             {
                 'train' : *train,
@@ -51,7 +55,7 @@
                                 stop: 60000,
                                 one_hot: false,
                             },
-                            classes: [1, 7],
+                            classes: [1, 8],
                             one_hot: true,
                         },
                 #'test' : !obj:pieceout.diamond.Diamond {
