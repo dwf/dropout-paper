@@ -1,0 +1,91 @@
+!obj:pylearn2.train.Train {
+    dataset: &train !obj:pieceout.datasets.diamond.Diamond {
+        num_examples: 100,
+        rng: 1,
+    },
+    model: !obj:pylearn2.models.mlp.MLP {
+        layers: [
+                 !obj:pylearn2.models.maxout.Maxout {
+                     layer_name: 'h0',
+                     num_units: 5000,
+                     num_pieces: 1,
+                     irange: .5,
+                     #init_bias: 1.,
+                     min_zero: true,
+                 },
+                 !obj:pylearn2.models.maxout.Maxout {
+                     layer_name: 'h1',
+                     num_units: 5000,
+                     num_pieces: 1,
+                     irange: .5,
+                     #init_bias: 1.,
+                     min_zero: true,
+                     mask_weights: !obj:pieceout.block_diagonal_mask {
+                         block_rows: 10,
+                         block_cols: 10,
+                         repeat: 500
+                     }
+                 },
+                 !obj:pieceout.ensemble_sigmoid.MultiSigmoid {
+                     layer_name: 'y',
+                     irange: .5,
+                     dim: 500,
+                     mask_weights: !obj:pieceout.block_diagonal_mask {
+                        block_rows: 10,
+                        block_cols: 1,
+                        repeat: 500
+                     }
+                 }
+                ],
+        nvis: 2,
+        seed: 0
+        #seed: {SEED}
+    },
+    algorithm: !obj:pylearn2.training_algorithms.sgd.SGD {
+        batch_size: 100,
+        #batch_size: {BATCH_SIZE},
+        learning_rate: 0.1,
+        #learning_rate: {LEARNING_RATE},
+        init_momentum: 0.5,
+        #init_momentum: {INIT_MOMENTUM},
+        monitoring_dataset:
+            {
+                'train' : *train,
+                'valid' : !obj:pieceout.datasets.diamond.Diamond {
+                              num_examples: 500,
+                              rng: 2,
+                          },
+                #'test' : !obj:pieceout.diamond.Diamond {
+                #              num_examples: 10000,
+                #              rng: 3,
+                #          },
+            },
+        termination_criterion: !obj:pylearn2.termination_criteria.MonitorBased {
+            channel_name: "valid_y_misclass",
+            prop_decrease: 0.,
+            N: 100
+        },
+        update_callbacks: !obj:pylearn2.training_algorithms.sgd.ExponentialDecay {
+            decay_factor: 1.00001,
+            #decay_factor: {DECAY_FACTOR}, # 1.00001, # 1 + 1e-5
+            min_lr: .00000001 # 1e-8
+        }
+    },
+    extensions: [
+        !obj:pylearn2.train_extensions.best_params.MonitorBasedSaveBest {
+             channel_name: 'valid_y_misclass',
+             #save_path: "{PYLEARN2_TRAIN_FILE_FULL_STEM}_best.{SEED}.pkl"
+             save_path: "${PYLEARN2_TRAIN_FILE_FULL_STEM}_best.pkl"
+        },
+        !obj:pylearn2.training_algorithms.sgd.MomentumAdjustor {
+            start: 1,
+            saturate: 200,
+            #saturate: {MOMENTUM_SATURATE},
+            final_momentum: 0.7,
+            #final_momentum: {FINAL_MOMENTUM}
+        }
+    ],
+    #save_path: "{PYLEARN2_TRAIN_FILE_FULL_STEM}.{SEED}.pkl",
+    save_path: "${PYLEARN2_TRAIN_FILE_FULL_STEM}.pkl",
+    save_freq: 100,
+}

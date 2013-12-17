@@ -1,28 +1,40 @@
 import numpy as np
 import theano.tensor as T
+from theano import config
 from pylearn2.models.mlp import Sigmoid
 from pylearn2.utils import block_gradient, sharedX
+from pylearn2.space import VectorSpace
 
 
 class MultiSigmoid(Sigmoid):
-    def __init__(self, **kwargs):
+    def __init__(self, monitor_individual=False, **kwargs):
         if 'mask_weights' not in kwargs:
             raise ValueError("mask_weights not specified")
-        super(MultiSigmoid, self).__init__(self, **kwargs)
-        self._gradient_mask = sharedX(np.ones(kwargs['dim']))
+        kwargs['monitor_style'] = 'classification'
+        super(MultiSigmoid, self).__init__(**kwargs)
+        self._monitor_individual = monitor_individual
+        if self._monitor_individual:
+            self._gradient_mask = sharedX(np.ones(kwargs['dim']))
 
     def get_monitoring_channels_from_state(self, state, target=None):
-        channels = super(MultiSigmoid, Sigmoid)
+        channels = super(MultiSigmoid,
+                         self).get_monitoring_channels_from_state(state,
+                                                                  target)
         for c in channels:
             if 'misclass' in c:
                 del channels[c]
         z, = state.owner.inputs
         geo = T.nnet.sigmoid(z.mean(axis=1).dimshuffle(0, 'x'))
-        misclass = T.neq(geo, target).mean()
+        geo_class = T.gt(geo, 0.5)
+        misclass = T.cast(T.neq(geo_class, target), config.floatX).mean()
         channels['misclass'] = misclass
-        for i in range(self.dim):
-            t = state[:, i:i + 1]
-            channels['misclass_' + i] = T.neq(t, target).mean()
+        ens_class = T.gt(state, 0.5)
+        # Broadcast the features dimension to compare against all.
+        btarget = T.addbroadcast(target, 1)
+        errors = T.cast(T.neq(ens_class, btarget), config.floatX).mean(axis=0)
+        if self._monitor_individual:
+            for i in range(self.dim):
+                channels['misclass_' + str(i)] = errors[i]
         return channels
 
     def cost(self, Y, Y_hat):
@@ -39,15 +51,29 @@ class MultiSigmoid(Sigmoid):
         assert isinstance(op.scalar_op, T.nnet.sigm.ScalarSigmoid)
         z, = owner.inputs
         # Broadcasted multiplication with the gradient mask.
-        z = (z * self._gradient_mask +
-             block_gradient(z) * (1. - self._gradient_mask))
+        if self._monitor_individual:
+            z = (z * self._gradient_mask +
+                 block_gradient(z) * (1. - self._gradient_mask))
         # Geometric mean.
         z = z.mean(axis=1)
 
-        term_1 = Y * T.nnet.softplus(-z)
-        term_2 = (1 - Y) * T.nnet.softplus(z)
+        # Expecting binary targets.
+        term_1 = Y[:, 0] * T.nnet.softplus(-z)
+        term_2 = (1 - Y[:, 0]) * T.nnet.softplus(z)
 
         total = term_1 + term_2
         assert total.ndim == 1
+        return total.mean()
 
-        return total
+    def get_output_space(self):
+        # Hack to get pylearn2 to stop complaining about fprop returning
+        # bigger stuff.
+        return VectorSpace(1)
+
+    def disable(self, expert):
+        assert self._monitor_individual, "Not monitoring individual experts"
+        v = self._gradient_mask.get_value()
+        if v[expert] == 0:
+            raise ValueError("already removed expert %d" % expert)
+        v[expert] = 0
+        self._gradient_mask.set_value(v)
