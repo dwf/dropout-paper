@@ -5,6 +5,16 @@ from load_covertype import load_covertype
 
 
 class CoverType(DenseDesignMatrix):
+    class_labels = [
+        "Spruce-Fir",
+        "Lodgepole Pine",
+        "Ponderosa Pine",
+        "Cottonwood/Willow",
+        "Aspen",
+        "Douglas-fir",
+        "Krummholz"
+    ]
+
     def __init__(self, which_set, standardize_quantitative=True,
                  separate_types=False, prefix=None, one_hot=False):
         if separate_types:
@@ -17,14 +27,14 @@ class CoverType(DenseDesignMatrix):
         prefix = prefix if prefix is not None else "${PYLEARN2_DATA_PATH}"
         self._raw = load_covertype(
             preprocess(os.path.join(prefix, "covertype")),
-            which_set=which_set,
+            which_sets=which_set,
             separate_types=self._separate_types,
             standardize_quantitative=self._standardize_quantitative
         )
         labels = self._raw[which_set]['labels'] - 1  # 0 - 6, not 1 - 7
         if one_hot:
             labels = one_hot(labels, max_label=6)
-        super(DenseDesignMatrix, self).__init__(
+        super(CoverType, self).__init__(
             X=self._raw[which_set]['features'],
             y=labels
         )

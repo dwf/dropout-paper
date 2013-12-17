@@ -2,18 +2,15 @@ import argparse
 import numpy
 import pylearn2.utils.serial
 import pylearn2.utils.environ
-import pieceout.iclr.diamond.hyperparameters
-import pieceout.iclr.mnist08.hyperparameters
-import pieceout.iclr.mnist17.hyperparameters
-import pieceout.iclr.mnist18.hyperparameters
-import pieceout.iclr.mnist23.hyperparameters
+from pieceout.iclr.hyperparameters import get_hyperparameters
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Run dropout network experiments.")
-    parser.add_argument("dataset", choices=['diamond', 'mnist23', 'mnist18',
-                                            'mnist17', 'mnist08'], type=str,
-                        help="The dataset settings to use for "
-                             "hyperparameters.")
+    parser = argparse.ArgumentParser(description="Run dropout experiments.")
+    #parser.add_argument("dataset", choices=['diamond', 'mnist23', 'mnist18',
+    #                                        'mnist17', 'mnist08'], type=str,
+    #                    help="The dataset settings to use for "
+    #                         "hyperparameters.")
     parser.add_argument("config", type=str,
                         help="YAML config file.")
     parser.add_argument("start_seed", type=int, help="RNG seed.")
@@ -36,11 +33,8 @@ def main():
         # Instantiate an RNG with seed.
         rng = numpy.random.RandomState(seed)
 
-        # Grab the hyperparameter scheme for this dataset.
-        mod = getattr(pieceout.iclr, args.dataset).hyperparameters
-
         # Iterate through them and put them in the environment.
-        for key, value in mod.get_hyperparameters(rng).iteritems():
+        for key, value in get_hyperparameters(rng).iteritems():
             pylearn2.utils.environ.putenv(key, str(value))
 
         train_obj = pylearn2.utils.serial.load_train_file(args.config)
