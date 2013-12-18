@@ -142,7 +142,7 @@ class MultiSigmoidExtension(object):
         # Update current best.
         self._best_errors[better] = errs[better]
         # Decrease the timeout counter of those that aren't.
-        self._ens_timeouts[~better & (self._ens_timeouts > 0)] -= 1
+        self._ens_timeouts[(~better) & (self._ens_timeouts > 0)] -= 1
         # Disable the gradient flow for anyone who has reached 0.
         idxs = np.where(self._ens_timeouts == 0)[0]
         for idx in idxs:
