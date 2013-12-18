@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 
 class MultiSigmoid(Sigmoid):
-    def __init__(self, monitor_individual=False, **kwargs):
+    def __init__(self, monitor_individual=True, **kwargs):
         if 'mask_weights' not in kwargs:
             raise ValueError("mask_weights not specified")
         kwargs['monitor_style'] = 'classification'
@@ -103,29 +103,31 @@ class MultiSigmoidExtension(object):
         batch = model.get_input_space().make_batch_theano()
         target = model.get_output_space().make_batch_theano()
         self._ens_timeouts = (self._timeout *
-                              np.ones(model.get_output_space().dim,
+                              np.ones(self._layer.dim,
                                       dtype='int32'))
-        self._errors = sharedX(np.zeros(model.get_output_space().dim,
+        self._errors = sharedX(np.zeros(self._layer.dim,
                                         dtype=config.floatX),
                                name='errors')
-        self._best_errors = sharedX(np.zeros(model.get_output_space().dim,
-                                             dtype=config.floatX),
-                                    name='best_errors')
+        self._best_errors = np.inf * np.ones(self._layer.dim,
+                                             dtype=config.floatX)
         btarget = T.addbroadcast(target, 1)
+        btarget.name = "btarget"
         state = model.fprop(batch)
         ens_class = T.gt(state, 0.5)
+        ens_class.name = "ens_class"
         batch_errors = T.cast(T.neq(ens_class, btarget),
                               config.floatX).sum(axis=0)
+        batch_errors.name = "batch_errors"
         self._f = theano.function([batch, target],
-                                  updates=[(self._errors, self._errors +
-                                            batch_errors)])
+                                  updates=[(self._errors,
+                                            self._errors + batch_errors)])
 
     def on_monitor(self, model, *_):
         # Reset the shared variable.
-        self._errors.set_value(np.zeros_like(self._errors.get_value(),
+        self._errors.set_value(np.zeros_like(self._errors.get_value(borrow=True),
                                              dtype=config.floatX))
         # Accumulate errors.
-        for b, t in self._dataset.iterator(mode='sequential',
+        for b, t in self._dataset.iterator(mode='sequential', targets=True,
                                            batch_size=self._batch_size):
             self._f(b, t)
         # Pull them out of the shared variable.
@@ -135,10 +137,16 @@ class MultiSigmoidExtension(object):
         better = errs < self._best_errors
         # Reset the timeouts of those that are.
         self._ens_timeouts[better] = self._timeout
+        log.info("%d subnetworks found new best. Mean improvement: %f" %
+                 (sum(better), (self._best_errors - errs).mean()))
+        # Update current best.
+        self._best_errors[better] = errs[better]
         # Decrease the timeout counter of those that aren't.
         self._ens_timeouts[~better & (self._ens_timeouts > 0)] -= 1
         # Disable the gradient flow for anyone who has reached 0.
-        for idx in np.where(self._ens_timeouts == 0):
-            model.disable(idx)
-        if model.all_disabled():
+        idxs = np.where(self._ens_timeouts == 0)[0]
+        for idx in idxs:
+            self._layer.disable(idx)
+        log.info("%d subnetworks were disabled." % len(idxs))
+        if self._layer.all_disabled():
             raise StopIteration()

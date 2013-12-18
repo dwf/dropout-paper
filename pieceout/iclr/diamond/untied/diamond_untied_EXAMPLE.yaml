@@ -26,7 +26,7 @@
                          repeat: 500
                      }
                  },
-                 !obj:pieceout.ensemble_sigmoid.MultiSigmoid {
+                 &layer !obj:pieceout.ensemble_sigmoid.MultiSigmoid {
                      layer_name: 'y',
                      irange: .5,
                      dim: 500,
@@ -51,7 +51,7 @@
         monitoring_dataset:
             {
                 'train' : *train,
-                'valid' : !obj:pieceout.datasets.diamond.Diamond {
+                'valid' : &valid !obj:pieceout.datasets.diamond.Diamond {
                               num_examples: 500,
                               rng: 2,
                           },
@@ -76,6 +76,11 @@
              channel_name: 'valid_y_misclass',
              #save_path: "{PYLEARN2_TRAIN_FILE_FULL_STEM}_best.{SEED}.pkl"
              save_path: "${PYLEARN2_TRAIN_FILE_FULL_STEM}_best.pkl"
+        },
+        !obj:pieceout.ensemble_sigmoid.MultiSigmoidExtension {
+             dataset: *valid,
+             layer: *layer,
+             batch_size: 100,
         },
         !obj:pylearn2.training_algorithms.sgd.MomentumAdjustor {
             start: 1,
