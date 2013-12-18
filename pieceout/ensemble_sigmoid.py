@@ -1,9 +1,14 @@
+import logging
 import numpy as np
 import theano.tensor as T
+import theano
 from theano import config
 from pylearn2.models.mlp import Sigmoid
 from pylearn2.utils import block_gradient, sharedX
 from pylearn2.space import VectorSpace
+
+
+log = logging.getLogger(__name__)
 
 
 class MultiSigmoid(Sigmoid):
@@ -14,7 +19,8 @@ class MultiSigmoid(Sigmoid):
         super(MultiSigmoid, self).__init__(**kwargs)
         self._monitor_individual = monitor_individual
         if self._monitor_individual:
-            self._gradient_mask = sharedX(np.ones(kwargs['dim']))
+            self._gradient_mask = sharedX(np.ones(kwargs['dim']),
+                                          name='gradient_mask')
 
     def get_monitoring_channels_from_state(self, state, target=None):
         channels = super(MultiSigmoid,
@@ -28,13 +34,6 @@ class MultiSigmoid(Sigmoid):
         geo_class = T.gt(geo, 0.5)
         misclass = T.cast(T.neq(geo_class, target), config.floatX).mean()
         channels['misclass'] = misclass
-        ens_class = T.gt(state, 0.5)
-        # Broadcast the features dimension to compare against all.
-        btarget = T.addbroadcast(target, 1)
-        errors = T.cast(T.neq(ens_class, btarget), config.floatX).mean(axis=0)
-        if self._monitor_individual:
-            for i in range(self.dim):
-                channels['misclass_' + str(i)] = errors[i]
         return channels
 
     def cost(self, Y, Y_hat):
@@ -77,3 +76,69 @@ class MultiSigmoid(Sigmoid):
             raise ValueError("already removed expert %d" % expert)
         v[expert] = 0
         self._gradient_mask.set_value(v)
+        log.info("******* Disabling expert %d" % expert)
+
+    def all_disabled(self):
+        return np.all(self._gradient_mask.get_value(borrow=True) == 0)
+
+
+class MultiSigmoidExtension(object):
+    """
+    An object called by pylearn2.train.Train at various
+    points during learning.
+    Useful for adding custom features to the basic learning
+    procedure.
+
+    This base class implements all callback methods as no-ops.
+    To add a feature to the Train class, implement a subclass of this
+    base class that overrides any subset of these no-op methods.
+    """
+    def __init__(self, layer, dataset, batch_size, timeout=100):
+        self._layer = layer
+        self._dataset = dataset
+        self._batch_size = batch_size
+        self._timeout = timeout
+
+    def setup(self, model, *_):
+        batch = model.get_input_space().make_batch_theano()
+        target = model.get_output_space().make_batch_theano()
+        self._ens_timeouts = (self._timeout *
+                              np.ones(model.get_output_space().dim,
+                                      dtype='int32'))
+        self._errors = sharedX(np.zeros(model.get_output_space().dim,
+                                        dtype=config.floatX),
+                               name='errors')
+        self._best_errors = sharedX(np.zeros(model.get_output_space().dim,
+                                             dtype=config.floatX),
+                                    name='best_errors')
+        btarget = T.addbroadcast(target, 1)
+        state = model.fprop(batch)
+        ens_class = T.gt(state, 0.5)
+        batch_errors = T.cast(T.neq(ens_class, btarget),
+                              config.floatX).sum(axis=0)
+        self._f = theano.function([batch, target],
+                                  updates=[(self._errors, self._errors +
+                                            batch_errors)])
+
+    def on_monitor(self, model, *_):
+        # Reset the shared variable.
+        self._errors.set_value(np.zeros_like(self._errors.get_value(),
+                                             dtype=config.floatX))
+        # Accumulate errors.
+        for b, t in self._dataset.iterator(mode='sequential',
+                                           batch_size=self._batch_size):
+            self._f(b, t)
+        # Pull them out of the shared variable.
+        errs = self._errors.get_value(borrow=True)
+        # Boolean mask of where the current error level is better than
+        # the previous best.
+        better = errs < self._best_errors
+        # Reset the timeouts of those that are.
+        self._ens_timeouts[better] = self._timeout
+        # Decrease the timeout counter of those that aren't.
+        self._ens_timeouts[~better & (self._ens_timeouts > 0)] -= 1
+        # Disable the gradient flow for anyone who has reached 0.
+        for idx in np.where(self._ens_timeouts == 0):
+            model.disable(idx)
+        if model.all_disabled():
+            raise StopIteration()
