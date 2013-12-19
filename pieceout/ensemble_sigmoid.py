@@ -4,6 +4,7 @@ import theano.tensor as T
 import theano
 from theano import config
 from pylearn2.models.mlp import Sigmoid
+from pylearn2.train_extensions import TrainExtension
 from pylearn2.utils import block_gradient, sharedX
 from pylearn2.space import VectorSpace
 
@@ -76,13 +77,13 @@ class MultiSigmoid(Sigmoid):
             raise ValueError("already removed expert %d" % expert)
         v[expert] = 0
         self._gradient_mask.set_value(v)
-        log.info("******* Disabling expert %d" % expert)
+        log.info("Disabling expert %d" % expert)
 
     def all_disabled(self):
         return np.all(self._gradient_mask.get_value(borrow=True) == 0)
 
 
-class MultiSigmoidExtension(object):
+class MultiSigmoidExtension(TrainExtension):
     def __init__(self, layer, dataset, batch_size, timeout=100):
         self._layer = layer
         self._dataset = dataset
@@ -94,6 +95,7 @@ class MultiSigmoidExtension(object):
         self._best_h0_b = [None] * self._layer.dim
         self._best_h1_b = [None] * self._layer.dim
         self._best_y_b = [None] * self._layer.dim
+        self._disabled = set()
 
     def setup(self, model, *_):
         batch = model.get_input_space().make_batch_theano()
@@ -147,43 +149,49 @@ class MultiSigmoidExtension(object):
         y_W = model.layers[2].get_weights()
         y_b = model.layers[2].get_biases()
 
+        # NUM_UNITS
+        NUM_UNITS = 10
         for idx in better_idxs:
-            NUM_UNITS = 10
-            # HACK, hardcoding 10
             s = slice(idx * NUM_UNITS, (idx + 1) * NUM_UNITS)
             self._best_h0_W[idx] = h0_W[:, s]
             self._best_h0_b[idx] = h0_b[s]
             self._best_h1_W[idx] = h1_W[s, s]
             self._best_h1_b[idx] = h1_b[s]
             self._best_y_W[idx] = y_W[s, idx:idx + 1]
-            self._best_y_b[idx] = y_b[s]
+            self._best_y_b[idx] = y_b[idx]
 
         # Decrease the timeout counter of those that aren't.
         self._ens_timeouts[(~better) & (self._ens_timeouts > 0)] -= 1
         # Disable the gradient flow for anyone who has reached 0.
         dis_idxs = np.where(self._ens_timeouts == 0)[0]
+        num_disabled = 0
         for idx in dis_idxs:
-            log.info("Restoring parameters and disabling subnetwork %d."
-                     % idx)
-            # Restore parameters of best subnet.
-            h0_W[:, s] = self._best_h0_W[idx]
-            h0_b[s] = self._best_h0_b[idx]
-            h1_W[s, s] = self._best_h1_W[idx]
-            h1_b[s] = self._best_h1_b[idx]
-            y_W[s, idx:idx + 1] = self._best_y_W[idx]
-            y_b[s] = self._best_y_b[idx]
             # Disable.
-            self._layer.disable(idx)
+            if idx not in self._disabled:
+                num_disabled += 1
+                log.info("Restoring/disabling subnetwork %d."
+                         % idx)
+                # Restore parameters of best subnet.
+                s = slice(idx * NUM_UNITS, (idx + 1) * NUM_UNITS)
+                h0_W[:, s] = self._best_h0_W[idx]
+                h0_b[s] = self._best_h0_b[idx]
+                h1_W[s, s] = self._best_h1_W[idx]
+                h1_b[s] = self._best_h1_b[idx]
+                y_W[s, idx:idx + 1] = self._best_y_W[idx]
+                y_b[idx] = self._best_y_b[idx]
+                self._layer.disable(idx)
+                self._disabled.add(idx)
         if len(dis_idxs) > 0:
             # Flush them to the shared variables in one swoop.
             log.info("Some subnetworks were reset... flushing parameters.")
             model.layers[0].set_weights(h0_W)
             model.layers[0].set_biases(h0_b)
             model.layers[1].set_weights(h1_W)
-            model.layers[1].set_biases(h1_W)
+            model.layers[1].set_biases(h1_b)
             model.layers[2].set_weights(y_W)
             model.layers[2].set_biases(y_b)
 
-        log.info("%d subnetworks were disabled." % len(dis_idxs))
+        log.info("%d subnetworks were disabled this round." % num_disabled)
+        log.info("%d subnetworks disabled in total." % len(dis_idxs))
         if self._layer.all_disabled():
             raise StopIteration()
