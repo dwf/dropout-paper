@@ -10,7 +10,7 @@ class ClassificationSubtask(DenseDesignMatrix):
         self.args = locals()
         X = dataset.get_design_matrix()
         y = dataset.get_targets()
-        assert set(classes).issubset(set(y))
+        assert set(classes).issubset(set(y.squeeze()))
         mask = (y.reshape((-1, 1)) == np.asarray(classes)).any(axis=1)
         X_ = X[mask]
         y_ = y[mask]
@@ -28,8 +28,9 @@ class ClassificationSubtask(DenseDesignMatrix):
 
 
 class Bagged(DenseDesignMatrix):
-    def __init__(self, dataset):
+    def __init__(self, dataset, seed):
         X = dataset.get_design_matrix()
         y = dataset.get_targets()
-        indices = np.random.random_integers(0, X.shape[0] - 1, size=X.shape[0])
+        rng = np.random.RandomState(seed)
+        indices = rng.random_integers(0, X.shape[0] - 1, size=X.shape[0])
         super(Bagged, self).__init__(X=X[indices], y=y[indices])
