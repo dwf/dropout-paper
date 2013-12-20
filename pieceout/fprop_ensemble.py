@@ -1,6 +1,10 @@
+import logging
 import numpy as np
 import theano
 from pylearn2.utils.bit_strings import all_bit_strings
+
+
+log = logging.getLogger(__name__)
 
 
 def fprop_ensemble(mlp, input_scales, arithmetic_mean=False, batch=None):
@@ -36,6 +40,7 @@ def fprop_ensemble(mlp, input_scales, arithmetic_mean=False, batch=None):
 
 
 def compare_ensemble(mlp, dataset, input_scales):
+    log.info('Compiling...')
     batch, state_geo = fprop_ensemble(mlp, input_scales, False)
     batch, state_ari = fprop_ensemble(mlp, input_scales, True, batch=batch)
     f = theano.function([batch], [state_geo, state_geo > 0.5,
@@ -49,12 +54,16 @@ def compare_ensemble(mlp, dataset, input_scales):
                                   dtype='float32')
     ensemble_preds_ari = np.empty(dataset.get_design_matrix().shape[0],
                                   dtype='uint8')
+    num_examples = dataset.get_design_matrix().shape[0]
     for i, row in enumerate(dataset.get_design_matrix()):
+        if i % 500 == 0:
+            log.info("fpropping example [%d / %d]" % (i + 1, num_examples))
         prob_geo, pred_geo, prob_ari, pred_ari = f(row.reshape((1, -1)))
         ensemble_probs_geo[i] = prob_geo
         ensemble_preds_geo[i] = pred_geo
         ensemble_probs_ari[i] = prob_ari
         ensemble_preds_ari[i] = pred_ari
+    log.info("Done fprops.")
     batch = mlp.get_input_space().make_batch_theano()
     g = theano.function([batch], [mlp.fprop(batch), mlp.fprop(batch) > 0.5],
                         allow_input_downcast=True)
@@ -64,10 +73,10 @@ def compare_ensemble(mlp, dataset, input_scales):
     targets = dataset.get_targets().squeeze()
 
     results = {}
-    results['approx_pred_error'] = (approx_pred != targets).mean()
-    results['ensemble_pred_error_geo'] = (ensemble_preds_geo != targets).mean()
-    results['ensemble_pred_error_ari'] = (ensemble_preds_ari != targets).mean()
-    results['approx_prob'] = approx_prob
-    results['ensemble_prob_geo'] = ensemble_probs_geo
-    results['ensemble_prob_ari'] = ensemble_probs_ari
+    results['weight_scaling_error'] = (approx_pred != targets).mean()
+    results['geometric_error'] = (ensemble_preds_geo != targets).mean()
+    results['arithmetic_error'] = (ensemble_preds_ari != targets).mean()
+    results['weight_scaling_output'] = approx_prob
+    results['geometric_output'] = ensemble_probs_geo
+    results['arithmetic_output'] = ensemble_probs_ari
     return results
